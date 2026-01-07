@@ -1194,6 +1194,10 @@
                         <strong style="font-size: 16px;">${name}</strong><br>
                         <span style="color: #555;">סוג: ${layer.name}</span><br>
                         <span style="color: #555;">מיקום: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br>
+                        <span style="color: #555;">זמן עדכון: ${new Date().toLocaleString()}</span>
+                        <span style="color: #555;">חוזק אות: ${Math.max(0, 100 - Math.floor(Math.random() * 50))}%</span><br>
+
+                        "
                     </div>
                 `;
 
