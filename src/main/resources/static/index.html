@@ -822,12 +822,41 @@
                     zoomControl: true
                 });
 
-                console.log('Adding tile layer...');
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
+                console.log('Adding tile layers...');
+                
+                // שכבת מפה רגילה (ברירת מחדל)
+                const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap',
                     maxZoom: 18,
                     minZoom: 3
-                }).addTo(map);
+                });
+                
+                // שכבת לוויין
+                const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: '© Esri',
+                    maxZoom: 18,
+                    minZoom: 3
+                });
+                
+                // שכבת היברידית (לוויין + שמות)
+                const hybridLayer = L.layerGroup([
+                    satelliteLayer,
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+                        maxZoom: 18
+                    })
+                ]);
+                
+                // הוסף את המפה הרגילה כברירת מחדל
+                streetLayer.addTo(map);
+                
+                // בקר שכבות
+                const baseMaps = {
+                    "🗺️ מפה רגילה": streetLayer,
+                    "🛰️ לוויין": satelliteLayer,
+                    "🌍 לוויין + תוויות": hybridLayer
+                };
+                
+                L.control.layers(baseMaps).addTo(map);
 
                 // אירוע שמתרחש כשהמפה נטענת
                 map.on('load', function() {
@@ -1196,7 +1225,7 @@
                     layer.markers = layer.markers.filter(m => m !== markers[id]);
                 }
                 
-                // הסר גם את קו החיזוי
+                // הסר את החיזוי
                 removePrediction(id);
                 
                 renderLayers();
@@ -1298,9 +1327,18 @@
 
         function removePrediction(forceId) {
             if (predictionLines[forceId]) {
-                predictionLines[forceId].line.remove();
-                predictionLines[forceId].arrow.remove();
+                try {
+                    if (predictionLines[forceId].line) {
+                        map.removeLayer(predictionLines[forceId].line);
+                    }
+                    if (predictionLines[forceId].arrow) {
+                        map.removeLayer(predictionLines[forceId].arrow);
+                    }
+                } catch (e) {
+                    console.error('Error removing prediction layers:', e);
+                }
                 delete predictionLines[forceId];
+                console.log('✅ Removed prediction for:', forceId);
             }
         }
 
@@ -1699,31 +1737,60 @@
             
             if (!confirm('האם למחוק את כל הכוחות ו-Dead Zones?')) return;
             
+            console.log('🧹 Clearing everything...');
+            
+            // כבה עדכונים אוטומטיים של חיזויים
+            showPredictions = false;
+            document.getElementById('show-predictions').checked = false;
+            
+            // מחיקת כל החיזויים - בכוח
+            map.eachLayer(function(layer) {
+                // מחק רק polylines ו-markers של חיזויים (לא את שכבת המפה הבסיסית)
+                if (layer instanceof L.Polyline && layer.options.dashArray) {
+                    map.removeLayer(layer);
+                }
+                if (layer instanceof L.Marker && layer.options.icon && 
+                    layer.options.icon.options.html && 
+                    layer.options.icon.options.html.includes('transform: rotate')) {
+                    map.removeLayer(layer);
+                }
+            });
+            predictionLines = {};
+            
+            // מחיקת כל הסמנים
+            for (const id in markers) {
+                if (markers[id]) {
+                    markers[id].remove();
+                }
+            }
+            markers = {};
+            
+            // מחיקת dead zones
+            for (const id in deadzones) {
+                if (deadzones[id]) {
+                    if (deadzones[id].circle) deadzones[id].circle.remove();
+                    if (deadzones[id].marker) deadzones[id].marker.remove();
+                }
+            }
+            deadzones = {};
+            
+            // ניקוי השכבות
+            for (const layer of Object.values(layers)) {
+                layer.markers = [];
+            }
+            
+            renderLayers();
+            console.log('✅ Map cleared locally');
+            
+            // מחיקה מהשרת
             fetch(SERVER_URL + '/api/forces/all', {
                 method: 'DELETE'
             })
             .then(() => {
-                console.log('🧹 Cleared all forces');
-                for (const marker of Object.values(markers)) {
-                    marker.remove();
-                }
-                markers = {};
-                
-                // מחיקת dead zones
-                for (const dz of Object.values(deadzones)) {
-                    dz.circle.remove();
-                    dz.marker.remove();
-                }
-                deadzones = {};
-                
-                for (const layer of Object.values(layers)) {
-                    layer.markers = [];
-                }
-                renderLayers();
+                console.log('✅ Server cleared');
             })
             .catch(error => {
-                console.error('❌ Error clearing forces:', error);
-                showError('שגיאה במחיקת כוחות: ' + error.message);
+                console.error('❌ Server error:', error);
             });
         }
 
