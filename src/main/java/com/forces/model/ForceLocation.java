@@ -22,6 +22,12 @@ public class ForceLocation {
     @JsonProperty("timestamp")
     private long timestamp;
 
+    @JsonProperty("signalStrength")
+    private int signalStrength = 0; // 0-4
+
+    @JsonProperty("isConnected")
+    private boolean isConnected = true; // זיהוי ניתוק
+
     // Constructors
     public ForceLocation() {
         this.timestamp = System.currentTimeMillis();
@@ -85,6 +91,25 @@ public class ForceLocation {
         this.timestamp = timestamp;
     }
 
+    public int getSignalStrength() {
+        return signalStrength;
+    }   
+    public void setSignalStrength(int signalStrength) {
+        this.signalStrength = signalStrength;
+    }
+    public boolean isConnected() {
+        return isConnected;
+    }
+    public void setConnected(boolean connected) {
+        isConnected = connected;
+    }
+    
+    public boolean checkIfDisconnected() {
+        long timeSinceUpdate = System.currentTimeMillis() - this.timestamp;
+        this.isConnected = timeSinceUpdate < 30000; // 30 שניות
+        return !this.isConnected;
+    }
+
     @Override
     public String toString() {
         return "ForceLocation{" +
@@ -93,6 +118,8 @@ public class ForceLocation {
                 ", longitude=" + longitude +
                 ", type='" + type + '\'' +
                 ", name='" + name + '\'' +
+                ", signalStrength=" + signalStrength +
+                ", isConnected=" + isConnected +
                 ", timestamp=" + timestamp +
                 '}';
     }
