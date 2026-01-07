@@ -170,7 +170,7 @@
         <div class="config">
             <div class="field">
                 <label>🌐 כתובת שרת:</label>
-                <input type="text" id="server-url" value="http://localhost:8080">
+                <input type="text" id="server-url" value="https://deadzonesaver-production.up.railway.app/">
             </div>
 
             <div class="field">
@@ -221,11 +221,10 @@
         let locationsSent = 0;
 
         const forceTypes = ['infantry', 'armor', 'artillery', 'other'];
-        const forceNames = ['אלפא', 'בטא', 'גמא', 'דלתא', 'אפסילון'];
+        const forceNames = ['מאוג', 'מחט', 'מגד', 'מפ', 'ממ'];
 
         // מיקום מרכז ישראל
-        const CENTER = { lat: 32.0853, lng: 34.7818 };
-
+        const CENTER = { lat: 31.4267, lng: 34.3791 };
         function log(message, type = 'info') {
             const logDiv = document.getElementById('log');
             const entry = document.createElement('div');
