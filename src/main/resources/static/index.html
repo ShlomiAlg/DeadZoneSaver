@@ -1066,10 +1066,12 @@
                     
                     const latLng = marker.getLatLng();
                     const forceName = marker.options.title || forceId;
+                    const signalStrength = Math.max(0, 100 - Math.floor(Math.random() * 50)); // סימולציית עוצמת אות
                     
                     forceDiv.innerHTML = `
                         <div class="force-item-name">${layer.icon} ${forceName}</div>
                         <div class="force-item-id">📍 ${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}</div>
+                        <div class=force-item-id>📶 עוצמת אות: ${signalStrength}%</div>
                     `;
                     
                     forceDiv.onclick = function() {
