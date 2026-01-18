@@ -3,527 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מערכת מעקב כוחות - רספונסיבית</title>
+    <title>מערכת מעקב כוחות - DEADZONE SAVER</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html, body { height: 100%; width: 100%; overflow: hidden; background: #1a1a1a; font-family: Arial, sans-serif; }
 
-        body {
-            font-family: Arial, sans-serif;
-            height: 100vh;
-            overflow: hidden;
-            background: #1a1a1a;
-        }
+        #container { display: flex; height: 100vh; width: 100vw; flex-direction: row-reverse; }
 
-        /* קונטיינר ראשי - בברירת מחדל למחשב */
-        #container {
-            display: flex;
-            height: 100vh;
-            flex-direction: row-reverse;
-        }
+        #map { flex-grow: 1; height: 100%; background: #2c3e50; position: relative; z-index: 1; }
 
-        #map {
-            flex: 1;
-            height: 100%;
-            background: #e0e0e0;
-            position: relative;
-            z-index: 1;
-        }
+        #sidebar { width: 300px; height: 100%; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; z-index: 2; box-shadow: -2px 0 10px rgba(0,0,0,0.3); }
 
-        #sidebar {
-            width: 300px;
-            background: #2c3e50;
-            color: white;
-            padding: 20px;
-            overflow-y: auto;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
-            z-index: 2;
-        }
-
-        /* התאמה למובייל וטאבלט */
+        /* התאמה למובייל */
         @media (max-width: 768px) {
-            #container {
-                flex-direction: column; /* סרגל מתחת למפה */
-            }
-            #sidebar {
-                width: 100%;
-                height: 40vh; /* הסרגל תופס 40% מהגובה בנייד */
-                padding: 15px;
-            }
-            #location-bar {
-                right: 0 !important;
-                left: 0 !important;
-                font-size: 11px !important;
-            }
-            #add-force-modal, #add-deadzone-modal {
-                width: 95% !important;
-                min-width: unset !important;
-            }
+            #container { flex-direction: column; }
+            #map { height: 60vh; width: 100%; }
+            #sidebar { width: 100%; height: 40vh; padding: 15px; }
+            #location-bar { right: 0 !important; left: 0 !important; bottom: 40vh !important; font-size: 11px !important; }
         }
 
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #1a1a1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-size: 24px;
-            z-index: 9999;
-        }
-
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; display: flex; justify-content: center; align-items: center; color: white; font-size: 24px; z-index: 9999; }
         #loading.hidden { display: none; }
 
-        h2 {
-            margin-bottom: 20px;
-            color: #ecf0f1;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-
-        .layer-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px;
-            background: #34495e;
-            border-radius: 5px;
-            margin-bottom: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-            min-height: 48px; /* נוח לטאץ' */
-        }
-
+        .layer-header { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #34495e; border-radius: 5px; margin-bottom: 5px; cursor: pointer; min-height: 48px; transition: 0.3s; }
         .layer-header:hover { background: #3498db; }
         .layer-header.active { background: #27ae60; }
 
-        .layer-checkbox { width: 22px; height: 22px; cursor: pointer; }
-
-        .layer-name { font-weight: bold; font-size: 16px; }
-
-        .color-indicator {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 2px solid white;
-        }
-
-        #status {
-            background: #27ae60;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        #status.disconnected { background: #e74c3c; }
-        #status.connecting { background: #f39c12; }
-
-        .force-marker { background: transparent; border: none; }
-
-        .custom-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            font-size: 14px;
-        }
-
-        #location-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 300px;
-            background: rgba(44, 62, 80, 0.95);
-            color: white;
-            padding: 12px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            font-size: 14px;
-        }
-
-        #login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-        }
-
-        #login-overlay.hidden { display: none; }
-
-        #login-box {
-            background: #2c3e50;
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            width: 90%;
-            max-width: 400px;
-        }
-
-        #login-box input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 15px;
-            border-radius: 5px;
-            background: #34495e;
-            color: white;
-            border: 1px solid #3498db;
-        }
-
-        #add-force-modal, #add-deadzone-modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #2c3e50;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            z-index: 10001;
-            display: none;
-            min-width: 350px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        #add-force-modal.active, #add-deadzone-modal.active { display: block; }
-
-        .force-list {
-            margin-left: 10px;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-
+        .force-item { background: #2c3e50; padding: 8px 12px; margin: 5px 0; border-radius: 3px; border-left: 3px solid; font-size: 13px; cursor: pointer; }
+        .force-list { margin-left: 15px; max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
         .force-list.expanded { max-height: 500px; overflow-y: auto; }
 
-        .force-item {
-            background: #2c3e50;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 3px;
-            border-left: 4px solid;
-            cursor: pointer;
-        }
+        .custom-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); font-size: 14px; }
 
+        #location-bar { position: fixed; bottom: 0; left: 0; right: 300px; background: rgba(44, 62, 80, 0.95); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center; align-items: center; z-index: 10000; }
+        #login-box { background: #2c3e50; padding: 30px; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; }
+        #login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 5px; background: #34495e; color: white; border: 1px solid #3498db; }
+
+        .btn-primary { background: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: bold; }
         .admin-only { display: none; }
         
-        .btn-primary { background: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; width: 100%; }
-        
-        #map-instruction {
-            position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(52, 152, 219, 0.95);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            z-index: 2000;
-            display: none;
-        }
+        #add-force-modal, #add-deadzone-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c3e50; padding: 25px; border-radius: 10px; z-index: 10001; display: none; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .modal-active { display: block !important; }
 
+        #map-instruction { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #3498db; color: white; padding: 12px 25px; border-radius: 8px; z-index: 2000; display: none; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .selecting-mode { cursor: crosshair !important; }
     </style>
 </head>
-<body>
+<body class="selecting-mode-disabled">
     <div id="login-overlay">
         <div id="login-box">
-            <h2>🔐 התחברות למערכת</h2>
+            <h2 style="color:white; margin-bottom:20px;">🛡️ DEADZONE SAVER</h2>
             <input type="text" id="username-input" placeholder="שם משתמש" />
             <input type="password" id="password-input" placeholder="סיסמה" />
-            <button class="btn-primary" onclick="login()">התחבר</button>
-            <button onclick="viewAsGuest()" style="background: #95a5a6; border:none; color:white; padding:10px; width:100%; margin-top:10px; border-radius:5px; cursor:pointer;">כניסה כאורח (צפייה בלבד)</button>
-            <div id="login-error" style="color: #e74c3c; margin-top:10px;"></div>
+            <button class="btn-primary" onclick="login()">התחבר למערכת</button>
+            <button onclick="viewAsGuest()" style="background:none; border:none; color:#bdc3c7; margin-top:15px; cursor:pointer; text-decoration:underline;">כניסה לתצוגה בלבד</button>
         </div>
     </div>
 
-    <div id="loading">⏳ טוען מפה...</div>
+    <div id="loading">⏳ טוען מערכות מפה...</div>
     
-    <div id="container" style="display: none;">
+    <div id="container">
         <div id="map"></div>
         <div id="sidebar">
-            <div id="error-message" style="display:none; background:#e74c3c; padding:10px; border-radius:5px; margin-bottom:10px;"></div>
-            <div id="status" class="connecting">מתחבר לשרת...</div>
+            <div id="status" style="padding:10px; text-align:center; border-radius:5px; margin-bottom:15px; font-weight:bold; background:#f39c12;">מתחבר לשרת...</div>
             
-            <div id="connection-info" style="font-size:12px; background:#34495e; padding:10px; border-radius:5px; margin-bottom:10px;">
-                <div>מחובר: <span id="connected-status">לא</span></div>
-                <div id="user-status">משתמש: <span id="current-user">אורח</span></div>
+            <div style="font-size:12px; margin-bottom:15px; background:#34495e; padding:8px; border-radius:5px;">
+                👤 משתמש: <span id="current-user">אורח</span>
             </div>
 
-            <button id="logout-btn" style="display: none; background:#e74c3c; color:white; border:none; padding:8px; width:100%; border-radius:5px; margin-bottom:10px;" onclick="logout()">התנתק</button>
-            
-            <h2>שכבות כוחות</h2>
+            <h3 style="margin-bottom:15px; border-bottom:2px solid #3498db; padding-bottom:5px;">שכבות כוחות</h3>
             <div id="layers"></div>
             
-            <div id="test-buttons" class="admin-only" style="margin-top:10px;">
-                <button class="btn-primary" onclick="openAddForceModal()" style="margin-bottom:5px;">➕ הוסף כוח ידני</button>
-                <button class="btn-primary" onclick="openAddDeadZoneModal()" style="background:#e67e22; margin-bottom:5px;">☢️ הוסף Dead Zone</button>
-                <button class="btn-primary" onclick="clearAllForces()" style="background:#c0392b;">🗑️ נקה הכל</button>
+            <div class="admin-only" style="margin-top:20px; border-top:1px solid #455a64; pt:15px;">
+                <button class="btn-primary" onclick="openAddForceModal()" style="margin-bottom:10px;">➕ הוסף כוח ידני</button>
+                <button class="btn-primary" onclick="openAddDeadZoneModal()" style="background:#e67e22; margin-bottom:10px;">☢️ הגדר Dead Zone</button>
+                <button class="btn-primary" onclick="clearAllForces()" style="background:#c0392b;">🗑️ נקה מפה</button>
             </div>
-            
-            <div class="prediction-controls" style="background:#34495e; padding:10px; border-radius:5px; margin-top:15px;">
-                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                    <input type="checkbox" id="show-predictions" checked onchange="togglePredictions()">
-                    🔮 הצג חיזויי מסלול
+
+            <div style="background:#34495e; padding:12px; border-radius:5px; margin-top:15px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px;">
+                    <input type="checkbox" id="show-predictions" checked onchange="togglePredictions()"> 🔮 חיזויי מסלול (AI)
                 </label>
-                <div style="margin-top:10px; font-size:12px;">
-                    <label>זמן חיזוי: <span id="prediction-time-label">60</span> שניות</label>
-                    <input type="range" id="prediction-time" min="30" max="300" value="60" step="30" style="width:100%" oninput="updatePredictionTime(this.value)">
-                </div>
             </div>
+
+            <button id="logout-btn" style="display:none; margin-top:20px; background:#455a64;" class="btn-primary" onclick="logout()">התנתק</button>
         </div>
         
         <div id="location-bar">
-            <div id="location-info" style="display:flex; gap:15px;">
+            <div style="display:flex; gap:20px;">
                 <div>📍 <span id="mouse-coords" style="font-family:monospace;">---, ---</span></div>
-                <div id="location-name" style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">טוען מיקום...</div>
+                <div id="location-name" style="opacity:0.8;">מזהה מיקום...</div>
             </div>
-            <div>🗺️ זום: <span id="zoom-level">8</span></div>
+            <div>זום: <span id="zoom-level">8</span></div>
         </div>
     </div>
 
     <div id="map-instruction"></div>
 
     <div id="add-force-modal">
-        <div style="font-size:18px; margin-bottom:15px; border-bottom:2px solid #3498db; padding-bottom:5px;">➕ הוספת כוח חדש</div>
-        <input type="text" id="force-name-input" placeholder="שם הכוח" style="width:100%; padding:10px; margin-bottom:10px; background:#34495e; color:white; border:none; border-radius:5px;" />
-        <select id="force-type-input" style="width:100%; padding:10px; margin-bottom:10px; background:#34495e; color:white; border:none; border-radius:5px;">
-            <option value="infantry">חי"ר</option>
-            <option value="armor">שריון</option>
-            <option value="artillery">תותחנים</option>
+        <h3 style="color:white; margin-bottom:15px;">➕ הוספת כוח חדש</h3>
+        <input type="text" id="force-name-input" placeholder="שם הכוח / יחידה" style="width:100%; padding:12px; margin-bottom:10px; border-radius:5px; border:none;" />
+        <select id="force-type-input" style="width:100%; padding:12px; margin-bottom:10px; border-radius:5px; background:#34495e; color:white; border:none;">
+            <option value="infantry">כוחות חי"ר</option>
+            <option value="armor">כוחות שריון</option>
+            <option value="artillery">ארטילריה</option>
             <option value="other">אחר</option>
         </select>
-        <button class="btn-primary" onclick="selectLocationOnMap('force')" style="margin-bottom:10px;">📍 בחר מיקום במפה</button>
-        <div id="force-location-preview" style="display:none; font-size:12px; margin-bottom:10px;">נבחר: <span id="force-lat"></span>, <span id="force-lng"></span></div>
-        <div style="display:flex; gap:5px;">
-            <button class="btn-primary" onclick="submitForce()">אישור</button>
-            <button class="btn-primary" style="background:#95a5a6;" onclick="closeAddForceModal()">ביטול</button>
-        </div>
-    </div>
-
-    <div id="add-deadzone-modal">
-        <div style="font-size:18px; margin-bottom:15px; border-bottom:2px solid #e74c3c; padding-bottom:5px;">☢️ הוספת Dead Zone</div>
-        <input type="text" id="deadzone-name-input" placeholder="שם האזור" style="width:100%; padding:10px; margin-bottom:10px; background:#34495e; color:white; border:none; border-radius:5px;" />
-        <input type="number" id="deadzone-radius-input" value="2000" style="width:100%; padding:10px; margin-bottom:10px; background:#34495e; color:white; border:none; border-radius:5px;" />
-        <button class="btn-primary" onclick="selectLocationOnMap('deadzone')" style="margin-bottom:10px;">📍 בחר מרכז במפה</button>
-        <div id="deadzone-location-preview" style="display:none; font-size:12px; margin-bottom:10px;">נבחר: <span id="deadzone-lat"></span>, <span id="deadzone-lng"></span></div>
-        <div style="display:flex; gap:5px;">
-            <button class="btn-primary" style="background:#e74c3c;" onclick="submitDeadZone()">הוסף אזור</button>
-            <button class="btn-primary" style="background:#95a5a6;" onclick="closeAddDeadZoneModal()">ביטול</button>
-        </div>
+        <button class="btn-primary" onclick="selectLocationOnMap('force')" style="background:#16a085; margin-bottom:10px;">📍 דקור מיקום במפה</button>
+        <div id="force-location-preview" style="color:#2ecc71; font-weight:bold; font-size:12px; margin-bottom:10px; display:none; text-align:center;">מיקום נדקר בהצלחה!</div>
+        <button class="btn-primary" onclick="submitForce()">אשר והוסף</button>
+        <button onclick="closeAddForceModal()" style="background:none; border:none; color:#bdc3c7; width:100%; margin-top:10px; cursor:pointer;">ביטול</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script>
-        // --- משתנים גלובליים ---
+        // --- הגדרות מערכת ---
         const SERVER_URL = window.location.origin;
         let map, stompClient = null;
         let markers = {}, deadzones = {}, predictionLines = {};
-        let isAdmin = false, currentUser = 'guest', showPredictions = true;
-        let isSelectingLocation = false, locationCallback = null;
+        let isAdmin = false, isSelectingLocation = false, showPredictions = true;
 
-        const ADMIN_CREDENTIALS = { username: 'admin', password: 'admin123' };
         let layers = {
-            'infantry': { name: 'כוחות חי"ר', color: '#e74c3c', visible: true, markers: [], icon: '👥', expanded: true },
-            'armor': { name: 'כוחות שריון', color: '#3498db', visible: true, markers: [], icon: '🛡️', expanded: true },
-            'artillery': { name: 'תותחנים', color: '#f39c12', visible: true, markers: [], icon: '💣', expanded: true },
-            'other': { name: 'אחר', color: '#95a5a6', visible: true, markers: [], icon: '📦', expanded: true },
-            'deadzone': { name: 'Dead Zones', color: '#ff0000', visible: true, markers: [], icon: '☢️', expanded: true }
+            'infantry': { name: 'חי"ר', color: '#e74c3c', visible: true, markers: [], icon: '👥', expanded: true },
+            'armor': { name: 'שריון', color: '#3498db', visible: true, markers: [], icon: '🛡️', expanded: true },
+            'artillery': { name: 'ארטילריה', color: '#f39c12', visible: true, markers: [], icon: '💣', expanded: true },
+            'other': { name: 'כללי', color: '#95a5a6', visible: true, markers: [], icon: '📦', expanded: true },
+            'deadzone': { name: 'אזורי סכנה', color: '#ff0000', visible: true, markers: [], icon: '☢️', expanded: true }
         };
 
         // --- אתחול מפה ---
         function initMap() {
-            try {
-                map = L.map('map', { center: [32.0853, 34.7818], zoom: 8 });
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM' }).addTo(map);
-                
-                map.on('mousemove', e => {
-                    document.getElementById('mouse-coords').textContent = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-                    updateLocationName(e.latlng.lat, e.latlng.lng);
-                });
+            map = L.map('map', { center: [32.0853, 34.7818], zoom: 8, zoomControl: true });
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-                map.on('zoomend', () => document.getElementById('zoom-level').textContent = map.getZoom());
-                
-                window.addEventListener('resize', () => map.invalidateSize());
-
+            setTimeout(() => { 
+                map.invalidateSize(); 
                 document.getElementById('loading').classList.add('hidden');
-                document.getElementById('container').style.display = 'flex';
-                
-                renderLayers();
-                connectToServer();
-                loadExistingForces();
-            } catch (e) { console.error("Map Error:", e); }
+            }, 600);
+
+            map.on('mousemove', e => {
+                document.getElementById('mouse-coords').textContent = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+            });
+
+            map.on('zoomend', () => document.getElementById('zoom-level').textContent = map.getZoom());
+            
+            window.onresize = () => map.invalidateSize();
+
+            renderLayers();
+            connectToServer();
+            loadInitialData();
         }
 
-        // --- חיבור לשרת ---
+        // --- תקשורת Real-time ---
         function connectToServer() {
-            fetch(SERVER_URL + '/api/forces/health').then(() => {
-                const socket = new SockJS(SERVER_URL + '/ws');
-                stompClient = Stomp.over(socket);
-                stompClient.connect({}, frame => {
-                    updateStatus('connected', 'מחובר ✓');
-                    document.getElementById('connected-status').textContent = 'כן';
-                    
-                    stompClient.subscribe('/topic/locations', msg => {
-                        const data = JSON.parse(msg.body);
-                        addForce(data.id, data.latitude, data.longitude, data.type, data.name);
-                    });
-                    
-                    stompClient.subscribe('/topic/deadzones', msg => {
-                        const dz = JSON.parse(msg.body);
-                        addDeadZone(dz.id, dz.latitude, dz.longitude, dz.radius, dz.name, dz.description);
-                    });
+            const socket = new SockJS(SERVER_URL + '/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null; // שקט בלוגים
+
+            stompClient.connect({}, () => {
+                updateStatus('connected', 'מחובר בזמן אמת ✓');
+                
+                stompClient.subscribe('/topic/locations', msg => {
+                    const data = JSON.parse(msg.body);
+                    processLocationUpdate(data);
                 });
-            }).catch(() => updateStatus('disconnected', 'שרת לא זמין ⚠️'));
+
+                stompClient.subscribe('/topic/deadzones', msg => {
+                    const dz = JSON.parse(msg.body);
+                    addDeadZoneToMap(dz);
+                });
+                
+                stompClient.subscribe('/topic/removed', msg => removeForceFromMap(msg.body));
+            }, () => {
+                updateStatus('disconnected', 'ניתוק - מנסה להתחבר... ⚠️');
+                setTimeout(connectToServer, 5000);
+            });
         }
 
-        function updateStatus(status, text) {
-            const el = document.getElementById('status');
-            el.textContent = text;
-            el.className = status;
-        }
-
-        // --- ניהול שכבות וכוחות ---
-        function renderLayers() {
-            const div = document.getElementById('layers');
-            div.innerHTML = '';
-            for (const [key, layer] of Object.entries(layers)) {
-                const layerEl = document.createElement('div');
-                layerEl.innerHTML = `
-                    <div class="layer-header ${layer.visible ? 'active' : ''}" onclick="toggleLayerExpand('${key}')">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" class="layer-checkbox" ${layer.visible ? 'checked' : ''} onclick="event.stopPropagation(); toggleLayer('${key}')">
-                            <span class="layer-name">${layer.icon} ${layer.name}</span>
-                        </div>
-                        <div class="color-indicator" style="background:${layer.color}"></div>
-                    </div>
-                    <div id="list-${key}" class="force-list ${layer.expanded ? 'expanded' : ''}"></div>
-                `;
-                div.appendChild(layerEl);
-            }
-        }
-
-        function toggleLayer(key) {
-            layers[key].visible = !layers[key].visible;
-            layers[key].markers.forEach(m => layers[key].visible ? m.addTo(map) : m.remove());
-            renderLayers();
-        }
-
-        function toggleLayerExpand(key) {
-            layers[key].expanded = !layers[key].expanded;
-            renderLayers();
-        }
-
-        function addForce(id, lat, lng, type, name) {
-            if (markers[id]) {
-                markers[id].setLatLng([lat, lng]);
+        function processLocationUpdate(data) {
+            if (markers[data.id]) {
+                markers[data.id].setLatLng([data.latitude, data.longitude]);
             } else {
-                const layer = layers[type] || layers['other'];
+                const layer = layers[data.type] || layers['other'];
                 const icon = L.divIcon({
                     className: 'force-marker',
                     html: `<div class="custom-icon" style="background:${layer.color}">${layer.icon}</div>`,
                     iconSize: [30, 30]
                 });
-                const marker = L.marker([lat, lng], { icon }).bindPopup(`<b>${name}</b>`);
-                if (layer.visible) marker.addTo(map);
-                markers[id] = marker;
+                const marker = L.marker([data.latitude, data.longitude], { icon }).addTo(map);
+                marker.bindPopup(`<b>${data.name}</b><br>סוג: ${layer.name}`);
+                markers[data.id] = marker;
                 layer.markers.push(marker);
+                if (!layer.visible) marker.remove();
             }
-            if (showPredictions) updatePrediction(id);
+            if (showPredictions) fetchPrediction(data.id);
+            renderLayers(); 
         }
 
-        function addDeadZone(id, lat, lng, radius, name, description) {
-            if (deadzones[id]) return;
-            const circle = L.circle([lat, lng], { radius, color: 'red', fillOpacity: 0.2 }).addTo(map);
-            circle.bindPopup(`<b>${name}</b><br>${description}`);
-            deadzones[id] = circle;
+        // --- ניהול שכבות ---
+        function renderLayers() {
+            const container = document.getElementById('layers');
+            container.innerHTML = '';
+            Object.entries(layers).forEach(([key, layer]) => {
+                const el = document.createElement('div');
+                el.innerHTML = `
+                    <div class="layer-header ${layer.visible ? 'active' : ''}" onclick="toggleLayerVisibility('${key}')">
+                        <span>${layer.icon} ${layer.name} (${layer.markers.length})</span>
+                        <div style="width:12px; height:12px; border-radius:50%; background:${layer.color}"></div>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
         }
 
-        // --- לוגיקת אדמין ובחירת מיקום ---
+        function toggleLayerVisibility(key) {
+            layers[key].visible = !layers[key].visible;
+            layers[key].markers.forEach(m => layers[key].visible ? m.addTo(map) : m.remove());
+            renderLayers();
+        }
+
+        // --- אדמין ותפעול ---
         function login() {
             const u = document.getElementById('username-input').value;
             const p = document.getElementById('password-input').value;
-            if (u === ADMIN_CREDENTIALS.username && p === ADMIN_CREDENTIALS.password) {
+            if (u === 'admin' && p === 'admin123') {
                 isAdmin = true;
-                document.getElementById('login-overlay').classList.add('hidden');
+                document.getElementById('login-overlay').style.display = 'none';
                 document.querySelectorAll('.admin-only').forEach(e => e.style.display = 'block');
                 document.getElementById('logout-btn').style.display = 'block';
-                document.getElementById('current-user').textContent = 'מנהל';
-            }
+                document.getElementById('current-user').textContent = 'מנהל מערכת';
+            } else { alert('פרטים שגויים'); }
         }
 
-        function viewAsGuest() {
-            document.getElementById('login-overlay').classList.add('hidden');
-        }
+        function viewAsGuest() { document.getElementById('login-overlay').style.display = 'none'; }
 
         function selectLocationOnMap(type) {
             isSelectingLocation = true;
-            locationCallback = type;
-            document.getElementById('map-instruction').textContent = '👆 בחר מיקום במפה';
+            document.getElementById('map-instruction').textContent = '📍 דקור נקודה על המפה...';
             document.getElementById('map-instruction').style.display = 'block';
-            document.body.classList.add('selecting-mode');
+            document.getElementById('add-force-modal').classList.remove('modal-active');
             
             map.once('click', e => {
-                const lat = e.latlng.lat, lng = e.latlng.lng;
-                document.getElementById(type + '-lat').textContent = lat.toFixed(5);
-                document.getElementById(type + '-lng').textContent = lng.toFixed(5);
-                document.getElementById(type + '-location-preview').style.display = 'block';
-                
+                window.lastClickedPos = e.latlng;
+                document.getElementById('force-location-preview').style.display = 'block';
                 document.getElementById('map-instruction').style.display = 'none';
-                document.body.classList.remove('selecting-mode');
+                document.getElementById('add-force-modal').classList.add('modal-active');
                 isSelectingLocation = false;
             });
         }
 
         function submitForce() {
             const name = document.getElementById('force-name-input').value;
-            const lat = parseFloat(document.getElementById('force-lat').textContent);
-            const lng = parseFloat(document.getElementById('force-lng').textContent);
-            if (!name || isNaN(lat)) return alert("חסרים פרטים");
-
+            if (!name || !window.lastClickedPos) return alert('חסרים נתונים');
+            
             fetch(SERVER_URL + '/api/forces/update', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: 'm_'+Date.now(), latitude: lat, longitude: lng, name, type: document.getElementById('force-type-input').value })
+                body: JSON.stringify({
+                    id: 'manual_' + Date.now(),
+                    name: name,
+                    type: document.getElementById('force-type-input').value,
+                    latitude: window.lastClickedPos.lat,
+                    longitude: window.lastClickedPos.lng
+                })
             }).then(() => closeAddForceModal());
         }
 
-        // --- פונקציות עזר (חיזוי, זיהוי מיקום וכו') ---
-        function updateLocationName(lat, lng) {
-            // סימולציה של Reverse Geocoding פשוט כדי לא להעמיס
-            document.getElementById('location-name').textContent = `נ.צ. ${lat.toFixed(2)}, ${lng.toFixed(2)}`;
+        // --- חיזוי AI ---
+        function fetchPrediction(id) {
+            fetch(`${SERVER_URL}/api/trajectory/predict/${id}?seconds=60`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data && data.predictedPath) drawPath(id, data.predictedPath);
+                });
         }
 
-        function openAddForceModal() { document.getElementById('add-force-modal').classList.add('active'); }
-        function closeAddForceModal() { document.getElementById('add-force-modal').classList.remove('active'); }
-        function openAddDeadZoneModal() { document.getElementById('add-deadzone-modal').classList.add('active'); }
-        function closeAddDeadZoneModal() { document.getElementById('add-deadzone-modal').classList.remove('active'); }
+        function drawPath(id, path) {
+            if (predictionLines[id]) map.removeLayer(predictionLines[id]);
+            const pts = path.map(p => [p.latitude, p.longitude]);
+            predictionLines[id] = L.polyline(pts, { color: 'white', weight: 2, dashArray: '5, 10', opacity: 0.5 }).addTo(map);
+        }
+
+        function togglePredictions() {
+            showPredictions = document.getElementById('show-predictions').checked;
+            if (!showPredictions) Object.values(predictionLines).forEach(l => map.removeLayer(l));
+        }
+
+        function updateStatus(status, text) {
+            const s = document.getElementById('status');
+            s.className = status;
+            s.textContent = text;
+            s.style.background = status === 'connected' ? '#27ae60' : '#e74c3c';
+        }
+
+        function openAddForceModal() { document.getElementById('add-force-modal').classList.add('modal-active'); }
+        function closeAddForceModal() { document.getElementById('add-force-modal').classList.remove('modal-active'); }
 
         window.onload = initMap;
     </script>
