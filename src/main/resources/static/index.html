@@ -583,6 +583,32 @@
             font-size: 12px;
             color: #ecf0f1;
         }
+    
+        #collision-alert-container {
+            position: fixed;
+            bottom: 70px;
+            left: 20px;
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .collision-alert {
+            background: rgba(231, 76, 60, 0.95);
+            color: white;
+            padding: 12px 18px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            animation: fadeInAlert 0.3s ease;
+        }
+
+        @keyframes fadeInAlert {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
     </style>
 </head>
 <body>
@@ -746,6 +772,7 @@
         let locationCallback = null;
         let predictionLines = {};  // קווי חיזוי
         let showPredictions = true; // הצג/הסתר חיזויים
+        let activeCollisionAlerts = {};
 
         function showError(message) {
             const errorDiv = document.getElementById('error-message');
@@ -1326,6 +1353,49 @@
                 arrow: arrowMarker
             };
             
+            
+            const trackedForceMarker = markers[forceId];
+
+            if (trackedForceMarker) {
+
+                const forceName =
+                    trackedForceMarker.options.title || forceId;
+
+                const futurePoint =
+                    prediction.predictedPath[
+                        prediction.predictedPath.length - 1
+                    ];
+
+                if (futurePoint) {
+
+                    Object.values(deadzones).forEach(deadzone => {
+
+                        const center =
+                            deadzone.circle.getLatLng();
+
+                        const radius =
+                            deadzone.circle.getRadius();
+
+                        const distance =
+                            distanceMeters(
+                                futurePoint.latitude,
+                                futurePoint.longitude,
+                                center.lat,
+                                center.lng
+                            );
+
+                        if (distance <= radius + 15) {
+
+                            showCollisionAlert(
+                                forceName,
+                                deadzone.name || "Unknown"
+                            );
+                        }
+                    });
+                }
+            }
+
+
             console.log('🔮 Drew prediction for ' + forceId);
         }
 
@@ -1421,7 +1491,7 @@
                     marker.addTo(map);
                 }
 
-                deadzones[id] = { circle, marker };
+                deadzones[id] = { circle, marker, name };
                 layer.markers.push(circle);
                 layer.markers.push(marker);
                 
@@ -1829,6 +1899,37 @@
             }, 500); // המתן חצי שנייה לפני שליחת בקשה
         }
 
+        
+        function showCollisionAlert(forceName, deadZoneName) {
+            const key = forceName + "_" + deadZoneName;
+
+            if (activeCollisionAlerts[key]) return;
+
+            activeCollisionAlerts[key] = true;
+
+            const container = document.getElementById('collision-alert-container');
+            if (!container) return;
+
+            const alert = document.createElement('div');
+            alert.className = 'collision-alert';
+            alert.innerHTML = `⚠️ הכוח <b>${forceName}</b> מתקרב ל־DeadZone <b>${deadZoneName}</b>`;
+
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+                delete activeCollisionAlerts[key];
+            }, 5000);
+        }
+
+        function distanceMeters(lat1, lon1, lat2, lon2) {
+            return map.distance(
+                L.latLng(lat1, lon1),
+                L.latLng(lat2, lon2)
+            );
+        }
+
+
         window.toggleLayer = toggleLayer;
         window.toggleLayerExpand = toggleLayerExpand;
         window.login = login;
@@ -1885,152 +1986,8 @@
                 }
             }
         });
-
-
-        // ==========================================
-// קוד חדש: מערכת התראות על התנגשות חיזוי ב-DeadZones
-// ==========================================
-
-// פונקציה לחישוב מרחק במטרים בין שתי נקודות גיאוגרפיות
-function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // רדיוס כדור הארץ במטרים
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-// פונקציה להצגת ההתראה בתחתית המסך
-function showDeadZoneAlert(forceName, deadZoneName) {
-    // בדיקה אם כבר קיימת התראה זהה על המסך כדי למנוע כפילויות
-    const alertId = `alert-${forceName}-${deadZoneName}`.replace(/\s+/g, '-');
-    if (document.getElementById(alertId)) return;
-
-    // יצירת אלמנט ההתראה במידה ולא קיים מכלל קוד ה-CSS
-    let container = document.getElementById('deadzone-alerts-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'deadzone-alerts-container';
-        container.style.position = 'fixed';
-        container.style.bottom = '20px';
-        container.style.left = '50%';
-        container.style.transform = 'translateX(-50%)';
-        container.style.zIndex = '99999';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.gap = '10px';
-        container.style.width = '90%';
-        container.style.maxWidth = '500px';
-        document.body.appendChild(container);
-    }
-
-    const alertBox = document.createElement('div');
-    alertBox.id = alertId;
-    alertBox.style.background = 'rgba(220, 53, 69, 0.95)';
-    alertBox.style.color = 'white';
-    alertBox.style.padding = '15px 20px';
-    alertBox.style.borderRadius = '8px';
-    alertBox.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
-    alertBox.style.direction = 'rtl';
-    alertBox.style.fontFamily = 'Arial, sans-serif';
-    alertBox.style.fontSize = '16px';
-    alertBox.style.fontWeight = 'bold';
-    alertBox.style.display = 'flex';
-    alertBox.style.justifyContent = 'between';
-    alertBox.style.alignItems = 'center';
-    alertBox.style.border = '2px solid #ffc107';
-    alertBox.style.transition = 'all 0.3s ease';
-
-    alertBox.innerHTML = `
-        <div style="flex-grow: 1;">
-            ⚠️ התראת התנגשות: קו החיזוי של הכוח <span style="text-decoration: underline;">${forceName}</span> מתנגש (בטווח 15 מ') עם אזור <span style="text-decoration: underline;">${deadZoneName}</span>!
-        </div>
-        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-right: 15px; font-weight: bold;">×</button>
-    `;
-
-    container.appendChild(alertBox);
-
-    // הסרה אוטומטית של ההתראה לאחר 7 שניות
-    setTimeout(() => {
-        if (alertBox) alertBox.remove();
-    }, 7000);
-}
-
-// פונקציה שרצה בכל פעם שמתקבל חיזוי חדש ומבצעת את הבדיקה אל מול ה-DeadZones הקיימים
-function checkPredictionCollisionWithDeadZones(forceId, predictedPath) {
-    if (!predictedPath || predictedPath.length === 0) return;
-
-    // שליפת שם הכוח מתוך הנתונים הקיימים במערכת שלך
-    let forceName = forceId;
-    if (typeof forces !== 'undefined' && forces[forceId]) {
-        forceName = forces[forceId].name || forceId;
-    } else if (typeof globalForces !== 'undefined' && globalForces[forceId]) {
-        forceName = globalForces[forceId].name || forceId;
-    }
-
-    // שליפת רשימת ה-DeadZones הקיימת אצלך בקוד (מערך או אובייקט)
-    let activeDeadZones = [];
-    if (typeof deadZones !== 'undefined') {
-        activeDeadZones = Array.isArray(deadZones) ? deadZones : Object.values(deadZones);
-    } else if (typeof globalDeadZones !== 'undefined') {
-        activeDeadZones = Array.isArray(globalDeadZones) ? globalDeadZones : Object.values(globalDeadZones);
-    }
-
-    // מעבר על נקודות החיזוי ובדיקת מרחק מכל DeadZone
-    for (let point of predictedPath) {
-        for (let zone of activeDeadZones) {
-            // חישוב המרחק ממרכז ה-DeadZone אל נקודת החיזוי הנוכחית
-            const distanceToCenter = calculateDistanceMeters(point.latitude, point.longitude, zone.latitude, zone.longitude);
-            
-            // המרחק משולי ה-DeadZone (רדיוס האזור)
-            const distanceToDeadZoneEdge = distanceToCenter - zone.radius;
-
-            // אם נקודת החיזוי נכנסת לתוך האזור או נמצאת במרחק של עד 15 מטרים משוליו
-            if (distanceToDeadZoneEdge <= 15) {
-                showDeadZoneAlert(forceName, zone.name || "איזור חסום");
-                return; // מצאנו התנגשות, אין צורך להמשיך לבדוק את שאר נקודות המסלול הזה
-            }
-        }
-    }
-}
-
-// הוק (Hook) שמקשיב לקבלת נתוני החיזוי מה-WebSocket או ה-API הקיים שלך
-// מבלי לשנות את הפונקציה המקורית, אנחנו פשוט עוטפים או מוסיפים האזנה
-if (typeof stompClient !== 'undefined' && stompClient) {
-    // במידה וההרשמה לחיזוי מתבצעת דינמית, הקוד הבא יתפוס את ההודעות הנכנסות בפורמט הקיים במערכת
-    const originalSend = stompClient.send;
-    // (שומר על הקיים ללא שינוי, הבדיקה תופעל בתוך פונקציית הציור של החיזוי שלך)
-}
-
-// במידה ויש לך פונקציה שמציירת את קו החיזוי (למשל updatePrediction או drawPrediction), 
-// הקוד הבא מוודא שברגע שהיא נקראת, גם הבדיקה שלנו תופעל אוטומטית בצד
-setTimeout(() => {
-    const targetFunctionName = typeof updatePrediction === 'function' ? 'updatePrediction' : 
-                               typeof drawPrediction === 'function' ? 'drawPrediction' : null;
-    
-    if (targetFunctionName && window[targetFunctionName]) {
-        const originalFunc = window[targetFunctionName];
-        window[targetFunctionName] = function(...args) {
-            // הפעלת הפונקציה המקורית שלך בדיוק כפי שהיא בלי לגעת בה
-            originalFunc.apply(this, args);
-            
-            try {
-                // ניתוח הפרמטרים שנשלחו כדי לחלץ את ה-path וה-id
-                if (args[0] && args[0].forceId && args[0].predictedPath) {
-                    checkPredictionCollisionWithDeadZones(args[0].forceId, args[0].predictedPath);
-                } else if (args[1] && Array.isArray(args[1])) {
-                    checkPredictionCollisionWithDeadZones(args[0], args[1]);
-                }
-            } catch (e) {
-                console.error("Error in DeadZone collision check:", e);
-            }
-        };
-    }
-}, 2000);
     </script>
-    
+
+    <div id="collision-alert-container"></div>
 </body>
 </html>
