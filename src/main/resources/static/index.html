@@ -1145,22 +1145,13 @@
                 dzItemDiv.style.borderLeftColor = dzLayer.color;
                 
                 const latLng = dz.circle.getLatLng();
-                const dzName = dzId; // צריך לשמור את השם במבנה
+                const dzName = dz.name; // צריך לשמור את השם במבנה
                 
                 dzItemDiv.innerHTML = `
-                <div class="force-item-name">☢️ ${dzName}</div>
-                <div class="force-item-id">
-                    רדיוס: ${Math.round(dz.circle.getRadius())}m
-                </div>
-                ${dz.description ? `
-                    <div class="force-item-id">
-                        📝 ${dz.description}
-                    </div>
-                ` : ''}
-                <div class="force-item-id">
-                    📍 ${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}
-                </div>
-            `;
+                    <div class="force-item-name">☢️ ${dzName}</div>
+                    <div class="force-item-id">רדיוס: ${dz.circle.getRadius()}m</div>
+                    <div class="force-item-id">📍 ${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}</div>
+                `;
                 
                 dzItemDiv.onclick = function() {
                     map.setView([latLng.lat, latLng.lng], 13);
