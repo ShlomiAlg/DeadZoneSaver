@@ -61,6 +61,14 @@
             box-shadow: -2px 0 10px rgba(0,0,0,0.3);
         }
 
+        #map {
+            flex: 1;
+            height: 100%;
+            background: #e0e0e0;
+            position: relative;
+            z-index: 1;
+        }
+
         h2 {
             margin-bottom: 20px;
             color: #ecf0f1;
@@ -575,52 +583,9 @@
             font-size: 12px;
             color: #ecf0f1;
         }
-
-        /* --- סגנונות חדשים למערכת ההתראות בראש העמוד --- */
-        #top-alerts-container {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 90%;
-            max-width: 550px;
-            pointer-events: none;
-        }
-
-        .top-alert-item {
-            pointer-events: auto;
-            background: rgba(231, 76, 60, 0.95);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-            direction: rtl;
-            font-size: 15px;
-            font-weight: bold;
-            text-align: center;
-            border: 2px solid #c0392b;
-            animation: topAlertSlideDown 0.3s ease, topAlertPulse 2s infinite;
-        }
-
-        @keyframes topAlertSlideDown {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        @keyframes topAlertPulse {
-            0% { box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-            50% { box-shadow: 0 4px 25px rgba(231, 76, 60, 0.7); transform: scale(1.01); }
-            100% { box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        }
     </style>
 </head>
 <body>
-    <div id="top-alerts-container"></div>
-
     <div id="login-overlay">
         <div id="login-box">
             <h2>🔐 התחברות למערכת</h2>
@@ -684,8 +649,10 @@
         </div>
     </div>
 
+    <!-- הודעה קטנה למעלה -->
     <div id="map-instruction"></div>
 
+    <!-- Modal להוספת כוח -->
     <div id="add-force-modal">
         <div class="modal-header">➕ הוספת כוח חדש</div>
         <div class="modal-field">
@@ -716,6 +683,7 @@
         </div>
     </div>
 
+    <!-- Modal להוספת Dead Zone -->
     <div id="add-deadzone-modal">
         <div class="modal-header">☢️ הוספת Dead Zone</div>
         <div class="modal-field">
@@ -759,6 +727,7 @@
         let isAdmin = false;
         let currentUser = 'guest';
         
+        // נתוני אדמין (בפרודקשן - זה צריך להיות בשרת!)
         const ADMIN_CREDENTIALS = {
             username: 'admin',
             password: 'admin123'
@@ -775,9 +744,8 @@
         let deadzones = {};
         let isSelectingLocation = false;
         let locationCallback = null;
-        let predictionLines = {};  
-        let showPredictions = true; 
-        let activeAlerts = {}; // מבנה נתונים חדש למעקב אחר התראות קופצות
+        let predictionLines = {};  // קווי חיזוי
+        let showPredictions = true; // הצג/הסתר חיזויים
 
         function showError(message) {
             const errorDiv = document.getElementById('error-message');
@@ -802,6 +770,7 @@
                 document.getElementById('current-user').innerHTML = '<span class="admin-badge">אדמין</span> ' + username;
                 document.getElementById('logout-btn').style.display = 'block';
                 
+                // הצג כפתורי אדמין
                 document.querySelectorAll('.admin-only').forEach(el => {
                     el.style.display = 'block';
                 });
@@ -827,6 +796,7 @@
             document.getElementById('current-user').textContent = 'אורח (צפייה בלבד)';
             document.getElementById('logout-btn').style.display = 'none';
             
+            // הסתר כפתורי אדמין
             document.querySelectorAll('.admin-only').forEach(el => {
                 el.style.display = 'none';
             });
@@ -854,18 +824,21 @@
 
                 console.log('Adding tile layers...');
                 
+                // שכבת מפה רגילה (ברירת מחדל)
                 const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap',
                     maxZoom: 18,
                     minZoom: 3
                 });
                 
+                // שכבת לוויין
                 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: '© Esri',
                     maxZoom: 18,
                     minZoom: 3
                 });
                 
+                // שכבת היברידית (לוויין + שמות)
                 const hybridLayer = L.layerGroup([
                     satelliteLayer,
                     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
@@ -873,8 +846,10 @@
                     })
                 ]);
                 
+                // הוסף את המפה הרגילה כברירת מחדל
                 streetLayer.addTo(map);
                 
+                // בקר שכבות
                 const baseMaps = {
                     "🗺️ מפה רגילה": streetLayer,
                     "🛰️ לוויין": satelliteLayer,
@@ -883,21 +858,28 @@
                 
                 L.control.layers(baseMaps).addTo(map);
 
+                // אירוע שמתרחש כשהמפה נטענת
                 map.on('load', function() {
                     console.log('✅ Map tiles loaded successfully');
                 });
 
+                // כפה render של המפה
                 setTimeout(function() {
                     map.invalidateSize();
                     console.log('Map size invalidated');
                 }, 100);
 
+                // הוספת מעקב אחרי עכבר
                 map.on('mousemove', function(e) {
                     const lat = e.latlng.lat.toFixed(6);
                     const lng = e.latlng.lng.toFixed(6);
                     document.getElementById('mouse-coords').textContent = `${lat}, ${lng}`;
+                    
+                    // קבלת שם מיקום (Reverse Geocoding)
+                    updateLocationName(e.latlng.lat, e.latlng.lng);
                 });
 
+                // עדכון רמת זום
                 map.on('zoomend', function() {
                     document.getElementById('zoom-level').textContent = map.getZoom();
                 });
@@ -917,6 +899,7 @@
         function connectToServer() {
             console.log('🔌 Connecting to server:', SERVER_URL);
             
+            // בדיקה אם השרת זמין לפני חיבור WebSocket
             fetch(SERVER_URL + '/api/forces/health')
                 .then(response => {
                     if (!response.ok) {
@@ -928,6 +911,7 @@
                 .catch(error => {
                     console.error('❌ Server is not responding:', error);
                     updateStatus('disconnected', 'שרת לא זמין ⚠️');
+                    showError('השרת לא רץ. ודא שהשרת פועל על http://localhost:8080');
                     setTimeout(connectToServer, 5000);
                 });
         }
@@ -972,28 +956,31 @@
                         removeDeadZone(dzId);
                     });
 
-                    stompClient.subscribe('/topic/predictions', function(message) {
-                        console.log('🔮 Received trajectory prediction');
-                        const prediction = JSON.parse(message.body);
-                        drawPrediction(prediction.forceId, prediction);
-                    });
-
                 }, function(error) {
                     console.error('❌ WebSocket connection error:', error);
                     updateStatus('disconnected', 'שגיאת חיבור WebSocket ⚠️');
                     document.getElementById('connected-status').textContent = 'לא ✗';
-                    setTimeout(connectWebSocket, 5000);
+                    showError('לא הצלחתי להתחבר ל-WebSocket. השרת אולי לא תומך ב-WebSocket.');
+                    
+                    setTimeout(connectToServer, 5000);
                 });
             } catch (error) {
                 console.error('❌ Error creating WebSocket:', error);
-                setTimeout(connectWebSocket, 5000);
+                showError('שגיאה ביצירת חיבור WebSocket: ' + error.message);
+                setTimeout(connectToServer, 5000);
             }
         }
 
         function loadExistingForces() {
             console.log('📥 Loading existing forces from server...');
             fetch(SERVER_URL + '/api/forces/all')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Server returned ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(forces => {
                     console.log('✅ Loaded', forces.length, 'forces');
                     forces.forEach(force => {
@@ -1003,15 +990,18 @@
                 })
                 .catch(error => {
                     console.error('❌ Error loading forces:', error);
+                    showError('שגיאה בטעינת כוחות קיימים: ' + error.message);
                 });
             
+            // טעינת Dead Zones קיימים
             console.log('📥 Loading existing deadzones from server...');
             fetch(SERVER_URL + '/api/deadzones/all')
                 .then(response => response.json())
-                .then(dzs => {
-                    console.log('✅ Loaded', dzs.length, 'deadzones');
-                    dzs.forEach(dz => {
-                        addDeadZone(dz.id, dz.latitude, dz.longitude, dz.radius, dz.name, dz.description);
+                .then(deadzones => {
+                    console.log('✅ Loaded', deadzones.length, 'deadzones');
+                    deadzones.forEach(dz => {
+                        addDeadZone(dz.id, dz.latitude, dz.longitude, 
+                                   dz.radius, dz.name, dz.description);
                     });
                 })
                 .catch(error => {
@@ -1019,94 +1009,264 @@
                 });
         }
 
-        /* --- פונקציות מתמטיות ולוגיות חדשות לניהול התראות טווח של 15 מטרים --- */
-        
-        // חישוב מרחק מדויק במטרים בין שתי נקודות גיאוגרפיות (Haversine Formula)
-        function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // רדיוס כדור הארץ במטרים
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = text;
+            statusEl.className = status;
         }
 
-        // בדיקת חדירה או התקרבות של עד 15 מטרים לטווח האסור
-        function checkPredictionCollisions(forceId, forceName, predictedPath) {
-            if (!predictedPath || predictedPath.length === 0) return;
+        function renderLayers() {
+            const layersDiv = document.getElementById('layers');
+            layersDiv.innerHTML = '';
 
-            let dangerZoneDetected = null;
-
-            // סריקה של כל הנקודות החזויות במסלול העתידי של הכוח
-            for (const position of predictedPath) {
-                for (const [dzId, dz] of Object.entries(deadzones)) {
-                    const dzLatLng = dz.circle.getLatLng();
-                    const dzRadius = dz.circle.getRadius();
-
-                    const distanceToCenter = calculateDistanceMeters(
-                        position.latitude, position.longitude,
-                        dzLatLng.lat, dzLatLng.lng
-                    );
-
-                    // בדיקה האם הנקודה נכנסה לתוך האזור האסור או נמצאת במרחק התקרבות של פחות מ-15 מטרים ממנו
-                    if (distanceToCenter <= (dzRadius + 15)) {
-                        dangerZoneDetected = { id: dzId, name: dz.name || dzId };
-                        break;
-                    }
-                }
-                if (dangerZoneDetected) break; 
-            }
-
-            const alertKey = forceId;
-            const topAlertsContainer = document.getElementById('top-alerts-container');
-
-            if (dangerZoneDetected) {
-                // אם ההתראה הזו עדיין לא מוצגת על המסך - ניצור אותה כעת
-                if (!activeAlerts[alertKey]) {
-                    activeAlerts[alertKey] = dangerZoneDetected.name;
-
-                    const alertElement = document.createElement('div');
-                    alertElement.id = `top-alert-${forceId}`;
-                    alertElement.className = 'top-alert-item';
-                    alertElement.innerHTML = `🚨 אזהרה חמורה: הכוח "${forceName}" מתקרב או נמצא בטווח מסוכן (פחות מ-15 מטרים) מהאזור האסור "${dangerZoneDetected.name}"!`;
-                    
-                    topAlertsContainer.appendChild(alertElement);
-
-                    // הדגשה ויזואלית על המפה - הפיכת קו החיזוי לאדום עבה
-                    if (predictionLines[forceId] && predictionLines[forceId].line) {
-                        predictionLines[forceId].line.setStyle({ color: '#ff0000', weight: 6, opacity: 1 });
-                    }
-                }
-            } else {
-                // אם הסכנה חלפה או שהנתיב השתנה, נסיר את ההתראה מהמסך
-                if (activeAlerts[alertKey]) {
-                    const alertElement = document.getElementById(`top-alert-${forceId}`);
-                    if (alertElement) alertElement.remove();
-                    delete activeAlerts[alertKey];
-
-                    // החזרת קו החיזוי לצבע השכבה המקורית שלו
-                    if (predictionLines[forceId] && predictionLines[forceId].line) {
-                        let originalColor = '#3498db';
-                        const marker = markers[forceId];
-                        if (marker && layers[marker.forceType]) {
-                            originalColor = layers[marker.forceType].color;
+            for (const [key, layer] of Object.entries(layers)) {
+                if (key === 'deadzone') continue; // Dead Zones בנפרד
+                
+                const layerDiv = document.createElement('div');
+                layerDiv.style.marginBottom = '10px';
+                
+                // כותרת השכבה
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'layer-header' + (layer.visible ? ' active' : '');
+                headerDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" class="layer-checkbox" ${layer.visible ? 'checked' : ''} 
+                               onchange="toggleLayer('${key}')" onclick="event.stopPropagation()">
+                        <span class="layer-toggle" onclick="toggleLayerExpand('${key}')">
+                            ${layer.expanded ? '▼' : '▶'}
+                        </span>
+                        <div>
+                            <div class="layer-name">${layer.icon} ${layer.name}</div>
+                            <div class="layer-count">${layer.markers.length} יחידות</div>
+                        </div>
+                    </div>
+                    <div class="color-indicator" style="background: ${layer.color}"></div>
+                `;
+                
+                // רשימת הכוחות
+                const forceListDiv = document.createElement('div');
+                forceListDiv.className = 'force-list' + (layer.expanded ? ' expanded' : '');
+                
+                // מיון הכוחות לפי ID
+                const sortedMarkers = Array.from(Object.entries(markers))
+                    .filter(([id, marker]) => {
+                        // מצא את הסוג של הכוח
+                        for (const [layerKey, layerData] of Object.entries(layers)) {
+                            if (layerData.markers.includes(marker)) {
+                                return layerKey === key;
+                            }
                         }
-                        predictionLines[forceId].line.setStyle({ color: originalColor, weight: 3, opacity: 0.6 });
-                    }
-                }
+                        return false;
+                    });
+                
+                sortedMarkers.forEach(([forceId, marker]) => {
+                    const forceDiv = document.createElement('div');
+                    forceDiv.className = 'force-item';
+                    forceDiv.style.borderLeftColor = layer.color;
+                    
+                    const latLng = marker.getLatLng();
+                    const forceName = marker.options.title || forceId;
+                    const signalStrength = Math.max(0, 100 - Math.floor(Math.random() * 50)); // סימולציית עוצמת אות
+                    
+                    forceDiv.innerHTML = `
+                        <div class="force-item-name">${layer.icon} ${forceName}</div>
+                        <div class="force-item-id">📍 ${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}</div>
+                        <div class=force-item-id>📶 עוצמת אות: ${signalStrength}%</div>
+                    `;
+                    
+                    forceDiv.onclick = function() {
+                        map.setView([latLng.lat, latLng.lng], 15);
+                        marker.openPopup();
+                    };
+                    
+                    forceListDiv.appendChild(forceDiv);
+                });
+                
+                layerDiv.appendChild(headerDiv);
+                layerDiv.appendChild(forceListDiv);
+                layersDiv.appendChild(layerDiv);
             }
+            
+            // Dead Zones בנפרד
+            const dzLayer = layers['deadzone'];
+            const dzDiv = document.createElement('div');
+            dzDiv.style.marginBottom = '10px';
+            
+            const dzHeaderDiv = document.createElement('div');
+            dzHeaderDiv.className = 'layer-header' + (dzLayer.visible ? ' active' : '');
+            dzHeaderDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" class="layer-checkbox" ${dzLayer.visible ? 'checked' : ''} 
+                           onchange="toggleLayer('deadzone')" onclick="event.stopPropagation()">
+                    <span class="layer-toggle" onclick="toggleLayerExpand('deadzone')">
+                        ${dzLayer.expanded ? '▼' : '▶'}
+                    </span>
+                    <div>
+                        <div class="layer-name">${dzLayer.icon} ${dzLayer.name}</div>
+                        <div class="layer-count">${Object.keys(deadzones).length} אזורים</div>
+                    </div>
+                </div>
+                <div class="color-indicator" style="background: ${dzLayer.color}"></div>
+            `;
+            
+            const dzListDiv = document.createElement('div');
+            dzListDiv.className = 'force-list' + (dzLayer.expanded ? ' expanded' : '');
+            
+            Object.entries(deadzones).forEach(([dzId, dz]) => {
+                const dzItemDiv = document.createElement('div');
+                dzItemDiv.className = 'force-item';
+                dzItemDiv.style.borderLeftColor = dzLayer.color;
+                
+                const latLng = dz.circle.getLatLng();
+                const dzName = dzId; // צריך לשמור את השם במבנה
+                
+                dzItemDiv.innerHTML = `
+                    <div class="force-item-name">☢️ ${dzName}</div>
+                    <div class="force-item-id">רדיוס: ${dz.circle.getRadius()}m</div>
+                    <div class="force-item-id">📍 ${latLng.lat.toFixed(4)}, ${latLng.lng.toFixed(4)}</div>
+                `;
+                
+                dzItemDiv.onclick = function() {
+                    map.setView([latLng.lat, latLng.lng], 13);
+                    dz.circle.openPopup();
+                };
+                
+                dzListDiv.appendChild(dzItemDiv);
+            });
+            
+            dzDiv.appendChild(dzHeaderDiv);
+            dzDiv.appendChild(dzListDiv);
+            layersDiv.appendChild(dzDiv);
+        }
+
+        function toggleLayerExpand(layerKey) {
+            layers[layerKey].expanded = !layers[layerKey].expanded;
+            renderLayers();
+        }
+
+        function toggleLayer(layerKey) {
+            layers[layerKey].visible = !layers[layerKey].visible;
+            
+            layers[layerKey].markers.forEach(marker => {
+                if (layers[layerKey].visible) {
+                    marker.addTo(map);
+                } else {
+                    marker.remove();
+                }
+            });
+
+            renderLayers();
+        }
+
+        function createCustomIcon(color, icon) {
+            return L.divIcon({
+                className: 'force-marker',
+                html: `<div class="custom-icon" style="background-color: ${color}">${icon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15]
+            });
+        }
+
+        function addForce(id, lat, lng, type, name) {
+            // המרת סוגים ישנים לחדשים
+            if (type === 'air' || type === 'logistics') {
+                type = 'other';
+            }
+            
+            if (markers[id]) {
+                markers[id].setLatLng([lat, lng]);
+                console.log('📍 Updated force:', name);
+            } else {
+                const layer = layers[type];
+                if (!layer) {
+                    console.error('Unknown force type:', type);
+                    return;
+                }
+
+                const marker = L.marker([lat, lng], {
+                    icon: createCustomIcon(layer.color, layer.icon),
+                    title: name
+                });
+
+                const popupContent = `
+                    <div style="padding: 10px;">
+                        <strong style="font-size: 16px;">${name}</strong><br>
+                        <span style="color: #555;">סוג: ${layer.name}</span><br>
+                        <span style="color: #555;">מיקום: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br>
+                        <span style="color: #555;">זמן עדכון: ${new Date().toLocaleString()}</span>
+                        <span style="color: #555;">חוזק אות: ${Math.max(0, 100 - Math.floor(Math.random() * 50))}%</span><br>
+
+                        "
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+
+                if (layer.visible) {
+                    marker.addTo(map);
+                }
+
+                markers[id] = marker;
+                layer.markers.push(marker);
+                console.log('✅ Added new force:', name);
+            }
+
+            renderLayers();
+            
+            // עדכן חיזוי אחרי הוספת מיקום
+            if (showPredictions) {
+                setTimeout(() => updatePrediction(id), 500);
+            }
+        }
+
+        function removeForce(id) {
+            if (markers[id]) {
+                markers[id].remove();
+                delete markers[id];
+                
+                for (const layer of Object.values(layers)) {
+                    layer.markers = layer.markers.filter(m => m !== markers[id]);
+                }
+                
+                // הסר את החיזוי
+                removePrediction(id);
+                
+                renderLayers();
+                console.log('🗑️ Removed force:', id);
+            }
+        }
+
+        // פונקציות חיזוי מסלול
+        function updatePrediction(forceId) {
+            if (!showPredictions) return;
+            
+            const predictionSeconds = parseInt(document.getElementById('prediction-time').value);
+            
+            fetch(SERVER_URL + '/api/trajectory/predict/' + forceId + '?seconds=' + predictionSeconds)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('No prediction available');
+                    }
+                    return response.json();
+                })
+                .then(prediction => {
+                    drawPrediction(forceId, prediction);
+                })
+                .catch(error => {
+                    console.log('No prediction for ' + forceId + ':', error.message);
+                });
         }
 
         function drawPrediction(forceId, prediction) {
+            // הסר חיזוי קודם
             removePrediction(forceId);
             
-            if (!showPredictions) return;
             if (!prediction || !prediction.predictedPath || prediction.predictedPath.length === 0) {
                 return;
             }
             
+            // בנה מערך של נקודות לקו
             const points = [[
                 prediction.currentPosition.latitude,
                 prediction.currentPosition.longitude
@@ -1116,16 +1276,18 @@
                 points.push([pos.latitude, pos.longitude]);
             });
             
+            // מצא את הצבע של הכוח
             let forceColor = '#3498db';
-            let forceName = forceId;
-            const forceMarker = markers[forceId];
-            if (forceMarker) {
-                forceName = forceMarker.options.title || forceId;
-                if (layers[forceMarker.forceType]) {
-                    forceColor = layers[forceMarker.forceType].color;
+            for (const [key, layer] of Object.entries(layers)) {
+                if (key === 'deadzone') continue;
+                const forceMarker = markers[forceId];
+                if (forceMarker && layer.markers.includes(forceMarker)) {
+                    forceColor = layer.color;
+                    break;
                 }
             }
             
+            // צייר קו מקווקו
             const predictionLine = L.polyline(points, {
                 color: forceColor,
                 weight: 3,
@@ -1134,6 +1296,7 @@
                 smoothFactor: 1
             }).addTo(map);
             
+            // הוסף חץ בסוף
             const lastPoint = points[points.length - 1];
             const arrowIcon = L.divIcon({
                 html: `<div style="color: ${forceColor}; font-size: 24px; transform: rotate(${prediction.heading}deg);">➤</div>`,
@@ -1144,6 +1307,7 @@
             
             const arrowMarker = L.marker(lastPoint, { icon: arrowIcon }).addTo(map);
             
+            // Popup עם מידע
             const popupContent = `
                 <div style="text-align: right; direction: rtl; padding: 5px;">
                     <strong>🔮 חיזוי מסלול</strong><br>
@@ -1156,13 +1320,11 @@
             `;
             predictionLine.bindPopup(popupContent);
             
+            // שמור את הקו והחץ
             predictionLines[forceId] = {
                 line: predictionLine,
                 arrow: arrowMarker
             };
-
-            // הפעלת מנגנון הבדיקה וההתראות עבור המסלול החזוי הנוכחי
-            checkPredictionCollisions(forceId, forceName, prediction.predictedPath);
             
             console.log('🔮 Drew prediction for ' + forceId);
         }
@@ -1182,274 +1344,519 @@
                 delete predictionLines[forceId];
                 console.log('✅ Removed prediction for:', forceId);
             }
-
-            // מחיקת ההתראה אם הקו או הכוח הוסר לחלוטין
-            if (activeAlerts[forceId]) {
-                const alertElement = document.getElementById(`top-alert-${forceId}`);
-                if (alertElement) alertElement.remove();
-                delete activeAlerts[forceId];
-            }
         }
 
         function togglePredictions() {
             showPredictions = document.getElementById('show-predictions').checked;
-            if (!showPredictions) {
-                Object.keys(predictionLines).forEach(forceId => {
+            
+            if (showPredictions) {
+                // הצג את כל החיזויים
+                for (const forceId of Object.keys(markers)) {
+                    updatePrediction(forceId);
+                }
+            } else {
+                // הסתר את כל החיזויים
+                for (const forceId of Object.keys(predictionLines)) {
                     removePrediction(forceId);
-                });
+                }
             }
         }
 
         function updatePredictionTime(value) {
             document.getElementById('prediction-time-label').textContent = value;
-            if (stompClient && stompClient.connected && isAdmin) {
-                stompClient.send("/app/prediction-time", {}, value);
-            }
-        }
-
-        function updateStatus(className, text) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.className = className;
-            statusDiv.textContent = text;
-        }
-
-        function addForce(id, lat, lng, type, name) {
-            if (markers[id]) {
-                const oldLayer = layers[markers[id].forceType];
-                if (oldLayer) {
-                    oldLayer.markers = oldLayer.markers.filter(m => m !== markers[id]);
+            
+            // עדכן את כל החיזויים עם הזמן החדש
+            if (showPredictions) {
+                for (const forceId of Object.keys(markers)) {
+                    updatePrediction(forceId);
                 }
-                map.removeLayer(markers[id]);
             }
-
-            const layerInfo = layers[type] || layers['other'];
-            
-            const customIcon = L.divIcon({
-                html: `<div class="custom-icon" style="background: ${layerInfo.color};">${layerInfo.icon}</div>`,
-                className: 'force-marker',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
-            });
-
-            const marker = L.marker([lat, lng], { icon: customIcon, title: name }).addTo(map);
-            marker.forceType = type;
-            marker.forceId = id;
-            
-            const popupContent = `
-                <div>
-                    <strong>${name}</strong><br>
-                    סוג: ${layerInfo.name}<br>
-                    מזהה: ${id}<br>
-                    נ"צ: ${lat.toFixed(5)}, ${lng.toFixed(5)}
-                </div>
-            `;
-            marker.bindPopup(popupContent);
-            
-            markers[id] = marker;
-            layerInfo.markers.push(marker);
-            
-            if (!layerInfo.visible) {
-                map.removeLayer(marker);
-            }
-            
-            renderLayers();
         }
 
-        function removeForce(id) {
-            if (markers[id]) {
-                const type = markers[id].forceType;
-                if (layers[type]) {
-                    layers[type].markers = layers[type].markers.filter(m => m !== markers[id]);
+        // עדכון חיזויים אוטומטי כל 5 שניות
+        setInterval(() => {
+            if (showPredictions) {
+                for (const forceId of Object.keys(markers)) {
+                    updatePrediction(forceId);
                 }
-                map.removeLayer(markers[id]);
-                delete markers[id];
-                removePrediction(id);
-                renderLayers();
             }
-        }
+        }, 5000);
 
         function addDeadZone(id, lat, lng, radius, name, description) {
             if (deadzones[id]) {
-                map.removeLayer(deadzones[id].circle);
+                deadzones[id].circle.setLatLng([lat, lng]);
+                deadzones[id].circle.setRadius(radius);
+                console.log('📍 Updated deadzone:', name);
+            } else {
+                const layer = layers['deadzone'];
+                
+                // יצירת עיגול
+                const circle = L.circle([lat, lng], {
+                    color: layer.color,
+                    fillColor: layer.color,
+                    fillOpacity: 0.3,
+                    radius: radius,
+                    weight: 2
+                });
+
+                // יצירת מרכז עם אייקון
+                const marker = L.marker([lat, lng], {
+                    icon: createCustomIcon(layer.color, layer.icon)
+                });
+
+                const popupContent = `
+                    <div style="padding: 10px;">
+                        <strong style="font-size: 16px; color: #e74c3c;">☢️ ${name}</strong><br>
+                        <span style="color: #555;">רדיוס: ${radius} מטר</span><br>
+                        <span style="color: #555;">מיקום: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span><br>
+                        ${description ? `<span style="color: #555;">תיאור: ${description}</span><br>` : ''}
+                    </div>
+                `;
+
+                circle.bindPopup(popupContent);
+                marker.bindPopup(popupContent);
+
+                if (layer.visible) {
+                    circle.addTo(map);
+                    marker.addTo(map);
+                }
+
+                deadzones[id] = { circle, marker };
+                layer.markers.push(circle);
+                layer.markers.push(marker);
+                
+                console.log('✅ Added new deadzone:', name, 'with radius:', radius);
             }
 
-            const circle = L.circle([lat, lng], {
-                color: '#ff0000',
-                fillColor: '#ff0000',
-                fillOpacity: 0.2,
-                radius: radius
-            }).addTo(map);
-
-            const popupContent = `
-                <div>
-                    <strong>☢️ שטח מת: ${name}</strong><br>
-                    רדיוס: ${radius} מטרים<br>
-                    תיאור: ${description || 'אין פירוט'}
-                </div>
-            `;
-            circle.bindPopup(popupContent);
-
-            deadzones[id] = {
-                circle: circle,
-                name: name
-            };
-
-            layers['deadzone'].markers.push(circle);
             renderLayers();
         }
 
         function removeDeadZone(id) {
             if (deadzones[id]) {
-                map.removeLayer(deadzones[id].circle);
-                layers['deadzone'].markers = layers['deadzone'].markers.filter(m => m !== deadzones[id].circle);
+                deadzones[id].circle.remove();
+                deadzones[id].marker.remove();
+                
+                const layer = layers['deadzone'];
+                layer.markers = layer.markers.filter(m => 
+                    m !== deadzones[id].circle && m !== deadzones[id].marker
+                );
+                
                 delete deadzones[id];
                 renderLayers();
+                console.log('🗑️ Removed deadzone:', id);
             }
         }
 
-        function renderLayers() {
-            const container = document.getElementById('layers');
-            container.innerHTML = '';
-            
-            Object.entries(layers).forEach(([key, layer]) => {
-                const count = key === 'deadzone' ? Object.keys(deadzones).length : layer.markers.length;
-                
-                const item = document.createElement('div');
-                item.className = 'layer-item';
-                
-                item.innerHTML = `
-                    <input type="checkbox" class="layer-checkbox" ${layer.visible ? 'checked' : ''} onclick="event.stopPropagation(); toggleLayer('${key}')" />
-                    <div class="layer-info">
-                        <div class="layer-name">${layer.icon} ${layer.name}</div>
-                        <div class="layer-count">אלמנטים פעילים: ${count}</div>
-                    </div>
-                    <div class="color-indicator" style="background: ${layer.color};"></div>
-                `;
-                container.appendChild(item);
-            });
+        // פונקציות Modal להוספת כוח
+        function openAddForceModal() {
+            if (!isAdmin) {
+                alert('רק אדמין יכול להוסיף כוחות!');
+                return;
+            }
+            document.getElementById('add-force-modal').classList.add('active');
         }
 
-        function toggleLayer(key) {
-            const layer = layers[key];
-            layer.visible = !layer.visible;
+        function closeAddForceModal() {
+            document.getElementById('add-force-modal').classList.remove('active');
+            document.getElementById('force-name-input').value = '';
+            document.getElementById('force-location-preview').style.display = 'none';
             
-            if (key === 'deadzone') {
-                Object.values(deadzones).forEach(dz => {
-                    if (layer.visible) dz.circle.addTo(map);
-                    else map.removeLayer(dz.circle);
-                });
-            } else {
-                layer.markers.forEach(marker => {
-                    if (layer.visible) marker.addTo(map);
-                    else map.removeLayer(marker);
-                });
+            // אם בתהליך בחירת מיקום - בטל אותו
+            if (isSelectingLocation) {
+                document.getElementById('map-instruction').classList.remove('active');
+                document.body.classList.remove('selecting-mode');
+                map.off('click');
+                isSelectingLocation = false;
             }
-            renderLayers();
         }
 
         function selectLocationOnMap(type) {
             isSelectingLocation = true;
             locationCallback = type;
             
-            document.getElementById('map-instruction').textContent = '📍 לחץ על המפה לבחירת מיקום (ESC לביטול)';
-            document.getElementById('map-instruction').classList.add('active');
+            // הסתר את המודל הנוכחי
+            if (type === 'force') {
+                document.getElementById('add-force-modal').classList.remove('active');
+            } else {
+                document.getElementById('add-deadzone-modal').classList.remove('active');
+            }
+            
+            // הצג הודעה קטנה למעלה
+            const instruction = document.getElementById('map-instruction');
+            instruction.textContent = '👆 לחץ על המפה לבחירת מיקום (ESC לביטול)';
+            instruction.classList.add('active');
+            
+            // שנה את הסמן לצלב
             document.body.classList.add('selecting-mode');
             
-            if (type === 'force') closeAddForceModal();
-            else closeAddDeadZoneModal();
-
-            map.on('click', function(e) {
+            console.log('📍 Waiting for map click...');
+            
+            // הוספת מאזין לחיצה על המפה
+            const handleMapClick = function(e) {
+                console.log('🎯 Map clicked at:', e.latlng);
+                
                 const lat = e.latlng.lat;
                 const lng = e.latlng.lng;
                 
-                document.getElementById('map-instruction').classList.remove('active');
+                // הסתר את ההודעה
+                instruction.classList.remove('active');
                 document.body.classList.remove('selecting-mode');
-                map.off('click');
-                isSelectingLocation = false;
-
-                if (locationCallback === 'force') {
-                    document.getElementById('force-lat').textContent = lat.toFixed(5);
-                    document.getElementById('force-lng').textContent = lng.toFixed(5);
+                
+                // עדכן את המיקום ב-Modal המתאים
+                if (type === 'force') {
+                    document.getElementById('force-lat').textContent = lat.toFixed(6);
+                    document.getElementById('force-lng').textContent = lng.toFixed(6);
                     document.getElementById('force-location-preview').style.display = 'block';
-                    openAddForceModal();
+                    
+                    // הצג שוב את המודל
+                    setTimeout(() => {
+                        document.getElementById('add-force-modal').classList.add('active');
+                    }, 100);
                 } else {
-                    document.getElementById('deadzone-lat').textContent = lat.toFixed(5);
-                    document.getElementById('deadzone-lng').textContent = lng.toFixed(5);
+                    document.getElementById('deadzone-lat').textContent = lat.toFixed(6);
+                    document.getElementById('deadzone-lng').textContent = lng.toFixed(6);
                     document.getElementById('deadzone-location-preview').style.display = 'block';
-                    openAddDeadZoneModal();
+                    
+                    // הצג שוב את המודל
+                    setTimeout(() => {
+                        document.getElementById('add-deadzone-modal').classList.add('active');
+                    }, 100);
                 }
-            });
+                
+                isSelectingLocation = false;
+                console.log('✅ Location selected:', lat, lng);
+                
+                // הסר את המאזין
+                map.off('click', handleMapClick);
+            };
+            
+            // הוסף את המאזין
+            map.on('click', handleMapClick);
         }
-
-        function openAddForceModal() { document.getElementById('add-force-modal').classList.add('active'); }
-        function closeAddForceModal() { document.getElementById('add-force-modal').classList.remove('active'); }
-        function openAddDeadZoneModal() { document.getElementById('add-deadzone-modal').classList.add('active'); }
-        function closeAddDeadZoneModal() { document.getElementById('add-deadzone-modal').classList.remove('active'); }
 
         function submitForce() {
             const name = document.getElementById('force-name-input').value;
             const type = document.getElementById('force-type-input').value;
             const lat = parseFloat(document.getElementById('force-lat').textContent);
             const lng = parseFloat(document.getElementById('force-lng').textContent);
-
-            if (!name || isNaN(lat)) {
-                alert('נא למלא שם ולבחור מיקום במפה');
+            
+            if (!name) {
+                alert('נא להזין שם כוח');
                 return;
             }
+            
+            if (isNaN(lat) || isNaN(lng)) {
+                alert('נא לבחור מיקום במפה');
+                return;
+            }
+            
+            const location = {
+                id: 'manual_' + Date.now(),
+                latitude: lat,
+                longitude: lng,
+                type: type,
+                name: name
+            };
 
-            const data = { name, type, latitude: lat, longitude: lng };
+            console.log('📤 Sending manual force:', location);
 
             fetch(SERVER_URL + '/api/forces/update', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            }).then(() => {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(location)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Manual force sent successfully:', data);
                 closeAddForceModal();
-                document.getElementById('force-name-input').value = '';
-                document.getElementById('force-location-preview').style.display = 'none';
-            }).catch(err => console.error(err));
+            })
+            .catch(error => {
+                console.error('❌ Error sending manual force:', error);
+                showError('שגיאה בשליחת כוח: ' + error.message);
+            });
+        }
+
+        // פונקציות Modal להוספת Dead Zone
+        function openAddDeadZoneModal() {
+            if (!isAdmin) {
+                alert('רק אדמין יכול להוסיף Dead Zones!');
+                return;
+            }
+            document.getElementById('add-deadzone-modal').classList.add('active');
+        }
+
+        function closeAddDeadZoneModal() {
+            document.getElementById('add-deadzone-modal').classList.remove('active');
+            document.getElementById('deadzone-name-input').value = '';
+            document.getElementById('deadzone-radius-input').value = '2000';
+            document.getElementById('deadzone-description-input').value = '';
+            document.getElementById('deadzone-location-preview').style.display = 'none';
+            
+            // אם בתהליך בחירת מיקום - בטל אותו
+            if (isSelectingLocation) {
+                document.getElementById('map-instruction').classList.remove('active');
+                document.body.classList.remove('selecting-mode');
+                map.off('click');
+                isSelectingLocation = false;
+            }
         }
 
         function submitDeadZone() {
             const name = document.getElementById('deadzone-name-input').value;
             const radius = parseFloat(document.getElementById('deadzone-radius-input').value);
-            const desc = document.getElementById('deadzone-description-input').value;
+            const description = document.getElementById('deadzone-description-input').value;
             const lat = parseFloat(document.getElementById('deadzone-lat').textContent);
             const lng = parseFloat(document.getElementById('deadzone-lng').textContent);
-
-            if (!name || isNaN(lat) || isNaN(radius)) {
-                alert('נא למלא שם, רדיוס ומיקום במפה');
+            
+            if (!name) {
+                alert('נא להזין שם אזור');
                 return;
             }
+            
+            if (isNaN(radius) || radius < 100) {
+                alert('רדיוס חייב להיות לפחות 100 מטר');
+                return;
+            }
+            
+            if (isNaN(lat) || isNaN(lng)) {
+                alert('נא לבחור מיקום במפה');
+                return;
+            }
+            
+            const deadzone = {
+                id: 'dz_manual_' + Date.now(),
+                latitude: lat,
+                longitude: lng,
+                radius: radius,
+                name: name,
+                description: description || 'אזור מסוכן'
+            };
 
-            const data = { name, radius, description: desc, latitude: lat, longitude: lng };
+            console.log('📤 Sending manual deadzone:', deadzone);
 
             fetch(SERVER_URL + '/api/deadzones/add', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            }).then(() => {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(deadzone)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Manual deadzone sent successfully:', data);
                 closeAddDeadZoneModal();
-                document.getElementById('deadzone-name-input').value = '';
-                document.getElementById('deadzone-location-preview').style.display = 'none';
-            }).catch(err => console.error(err));
+            })
+            .catch(error => {
+                console.error('❌ Error sending manual deadzone:', error);
+                showError('שגיאה בשליחת Dead Zone: ' + error.message);
+            });
+        }
+
+        function addTestForce() {
+            if (!isAdmin) {
+                alert('רק אדמין יכול להוסיף כוחות!');
+                return;
+            }
+            
+            const types = ['infantry', 'armor', 'artillery', 'other'];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const randomId = 'test_' + Date.now();
+            const randomLat = 32.0853 + (Math.random() - 0.5) * 2;
+            const randomLng = 34.7818 + (Math.random() - 0.5) * 2;
+            
+            const location = {
+                id: randomId,
+                latitude: randomLat,
+                longitude: randomLng,
+                type: randomType,
+                name: 'כוח בדיקה ' + Math.floor(Math.random() * 100)
+            };
+
+            console.log('📤 Sending test force:', location);
+
+            fetch(SERVER_URL + '/api/forces/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(location)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Test force sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('❌ Error sending test force:', error);
+                showError('שגיאה בשליחת כוח בדיקה: ' + error.message);
+            });
+        }
+
+        function addTestDeadZone() {
+            if (!isAdmin) {
+                alert('רק אדמין יכול להוסיף Dead Zones!');
+                return;
+            }
+            
+            const randomId = 'dz_' + Date.now();
+            const randomLat = 32.0853 + (Math.random() - 0.5) * 2;
+            const randomLng = 34.7818 + (Math.random() - 0.5) * 2;
+            const randomRadius = 1000 + Math.random() * 4000; // 1-5 ק"מ
+            
+            const deadzone = {
+                id: randomId,
+                latitude: randomLat,
+                longitude: randomLng,
+                radius: randomRadius,
+                name: 'אזור מסוכן ' + Math.floor(Math.random() * 100),
+                description: 'אזור אסור לחדירה - בדיקה'
+            };
+
+            console.log('📤 Sending test deadzone:', deadzone);
+
+            fetch(SERVER_URL + '/api/deadzones/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(deadzone)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Test deadzone sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('❌ Error sending test deadzone:', error);
+                showError('שגיאה בשליחת Dead Zone: ' + error.message);
+            });
         }
 
         function clearAllForces() {
-            if (confirm('האם אתה בטוח שברצונך למחוק את כל הכוחות והאזורים מהשרת?')) {
-                fetch(SERVER_URL + '/api/forces/all', { method: 'DELETE' });
-                fetch(SERVER_URL + '/api/deadzones/all', { method: 'DELETE' });
+            if (!isAdmin) {
+                alert('רק אדמין יכול למחוק כוחות!');
+                return;
             }
+            
+            if (!confirm('האם למחוק את כל הכוחות ו-Dead Zones?')) return;
+            
+            console.log('🧹 Clearing everything...');
+            
+            // כבה עדכונים אוטומטיים של חיזויים
+            showPredictions = false;
+            document.getElementById('show-predictions').checked = false;
+            
+            // מחיקת כל החיזויים - בכוח
+            map.eachLayer(function(layer) {
+                // מחק רק polylines ו-markers של חיזויים (לא את שכבת המפה הבסיסית)
+                if (layer instanceof L.Polyline && layer.options.dashArray) {
+                    map.removeLayer(layer);
+                }
+                if (layer instanceof L.Marker && layer.options.icon && 
+                    layer.options.icon.options.html && 
+                    layer.options.icon.options.html.includes('transform: rotate')) {
+                    map.removeLayer(layer);
+                }
+            });
+            predictionLines = {};
+            
+            // מחיקת כל הסמנים
+            for (const id in markers) {
+                if (markers[id]) {
+                    markers[id].remove();
+                }
+            }
+            markers = {};
+            
+            // מחיקת dead zones
+            for (const id in deadzones) {
+                if (deadzones[id]) {
+                    if (deadzones[id].circle) deadzones[id].circle.remove();
+                    if (deadzones[id].marker) deadzones[id].marker.remove();
+                }
+            }
+            deadzones = {};
+            
+            // ניקוי השכבות
+            for (const layer of Object.values(layers)) {
+                layer.markers = [];
+            }
+            
+            renderLayers();
+            console.log('✅ Map cleared locally');
+            
+            // מחיקה מהשרת
+            fetch(SERVER_URL + '/api/forces/all', {
+                method: 'DELETE'
+            })
+            .then(() => {
+                console.log('✅ Server cleared');
+            })
+            .catch(error => {
+                console.error('❌ Server error:', error);
+            });
         }
 
-        window.addEventListener('load', function() {
+        // Reverse Geocoding - המרת קואורדינטות לשם מיקום
+        let geocodeTimeout;
+        function updateLocationName(lat, lng) {
+            clearTimeout(geocodeTimeout);
+            
+            geocodeTimeout = setTimeout(function() {
+                fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=he`)
+                    .then(response => response.json())
+                    .then(data => {
+                        let locationName = 'לא זוהה';
+                        
+                        if (data.address) {
+                            const parts = [];
+                            if (data.address.city) parts.push(data.address.city);
+                            else if (data.address.town) parts.push(data.address.town);
+                            else if (data.address.village) parts.push(data.address.village);
+                            
+                            if (data.address.road) parts.push(data.address.road);
+                            else if (data.address.suburb) parts.push(data.address.suburb);
+                            
+                            locationName = parts.length > 0 ? parts.join(', ') : data.display_name;
+                        }
+                        
+                        document.getElementById('location-name').textContent = locationName;
+                    })
+                    .catch(error => {
+                        console.error('Geocoding error:', error);
+                        document.getElementById('location-name').textContent = 'שגיאה בזיהוי מיקום';
+                    });
+            }, 500); // המתן חצי שנייה לפני שליחת בקשה
+        }
+
+        window.toggleLayer = toggleLayer;
+        window.toggleLayerExpand = toggleLayerExpand;
+        window.login = login;
+        window.viewAsGuest = viewAsGuest;
+        window.logout = logout;
+        window.openAddForceModal = openAddForceModal;
+        window.closeAddForceModal = closeAddForceModal;
+        window.selectLocationOnMap = selectLocationOnMap;
+        window.submitForce = submitForce;
+        window.openAddDeadZoneModal = openAddDeadZoneModal;
+        window.closeAddDeadZoneModal = closeAddDeadZoneModal;
+        window.submitDeadZone = submitDeadZone;
+        window.togglePredictions = togglePredictions;
+        window.updatePredictionTime = updatePredictionTime;
+
+        // הפעלת המערכת
+        console.log('📍 Server URL:', SERVER_URL);
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOM loaded, initializing...');
             setTimeout(initMap, 500);
         });
 
+        // גם אם DOM כבר נטען
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
             setTimeout(initMap, 500);
         }
 
+        // תמיכה ב-Enter בטופס התחברות
         document.addEventListener('DOMContentLoaded', function() {
             const passwordInput = document.getElementById('password-input');
             if (passwordInput) {
@@ -1461,6 +1868,7 @@
             }
         });
 
+        // תמיכה ב-ESC לביטול בחירת מיקום
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && isSelectingLocation) {
                 console.log('❌ Location selection cancelled');
@@ -1469,6 +1877,7 @@
                 map.off('click');
                 isSelectingLocation = false;
                 
+                // החזר את המודל המתאים
                 if (locationCallback === 'force') {
                     document.getElementById('add-force-modal').classList.add('active');
                 } else {
@@ -1478,4 +1887,4 @@
         });
     </script>
 </body>
-</html>ארט02
+</html>
